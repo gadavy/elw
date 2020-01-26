@@ -8,19 +8,18 @@ type Pool struct {
 	p *sync.Pool
 }
 
-func NewPool(batchSize int) *Pool {
+func NewPool() *Pool {
 	return &Pool{
 		p: &sync.Pool{
 			New: func() interface{} {
-				return NewBatch(batchSize)
+				return NewBatch()
 			},
 		},
 	}
 }
 
-func (p *Pool) Get() **Batch {
-	b := p.p.Get().(*Batch)
-	return &b
+func (p *Pool) Get() *Batch {
+	return p.p.Get().(*Batch)
 }
 
 func (p *Pool) Put(b *Batch) {

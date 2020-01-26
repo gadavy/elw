@@ -9,7 +9,7 @@ import (
 
 func TestPool(t *testing.T) {
 	const data = "data"
-	p := NewPool(0)
+	p := NewPool()
 
 	var wg sync.WaitGroup
 
@@ -18,13 +18,13 @@ func TestPool(t *testing.T) {
 
 		go func() {
 			for i := 0; i < 100; i++ {
-				batch := *p.Get()
+				batch := p.Get()
 
 				assert.Zero(t, batch.Len(), "expected truncated buffer")
 
 				batch.AppendBytes([]byte(data))
 
-				assert.Equal(t, batch.Len(), len(data)+len(defaultMetaData), "expected buffer to contain data")
+				assert.Equal(t, batch.Len(), len(data), "expected buffer to contain data")
 
 				p.Put(batch)
 			}
