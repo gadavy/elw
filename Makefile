@@ -1,6 +1,3 @@
-NAMESPACE = github.com/TermiusOne/elw
-
-GOFLAGS = CGO_ENABLED=0 GOOS=linux GOARCH=amd64
 GOTEST_PACKAGES = $(shell go list ./...)
 
 gomod:
@@ -10,7 +7,7 @@ gotest: gomod
 	go test -race -v -cover -coverprofile coverage.out $(GOTEST_PACKAGES)
 
 gobench: gomod
-	go test -bench=. -benchmem
+	go test -race -bench=. -benchmem $(GOTEST_PACKAGES)
 
 golint:
 	golangci-lint run -v

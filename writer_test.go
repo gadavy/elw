@@ -1,108 +1,102 @@
 package elw
 
 import (
-	"fmt"
-	"strings"
 	"testing"
 	"time"
-
-	"github.com/TermiusOne/elw/batch"
 )
 
 func BenchmarkElasticWriter_Write(b *testing.B) {
 	b.StopTimer()
-	b.ReportAllocs()
-
-	var (
-		err error
-
-		message = []byte(strings.Repeat("test", 50))
-		pool    = batch.NewPool(512)
-	)
 
 	writer := ElasticWriter{
 		transport:    new(stubTransport),
 		storage:      new(stubStorage),
-		batch:        pool.Get(),
-		pool:         pool,
+		BatchSize:    1024 * 1024,
+		IndexName:    "test-index-",
+		TimeFormat:   "2006.01.02",
+		RotatePeriod: time.Second,
 		timer:        time.NewTimer(time.Second),
-		batchSize:    512,
-		sendInterval: time.Second,
 	}
+
+	writer.batch = writer.acquireBatch()
 
 	b.StartTimer()
 
-	b.Run("write()", func(b *testing.B) {
-		b.Run("Single", func(b *testing.B) {
-			for i := 0; i < b.N; i++ {
-				if _, err = writer.Write(message); err != nil {
-					b.Error(err)
-				}
-			}
-		})
-
-		writer.rotateBatch()
-
-		b.Run("Parallel (10)", func(b *testing.B) {
-			b.SetParallelism(10)
-			b.RunParallel(func(pb *testing.PB) {
-				for pb.Next() {
-					if _, err = writer.Write(message); err != nil {
-						b.Error(err)
-					}
-				}
-			})
-		})
-
-		writer.rotateBatch()
-
-		b.Run("Parallel (100)", func(b *testing.B) {
-			b.SetParallelism(100)
-			b.RunParallel(func(pb *testing.PB) {
-				for pb.Next() {
-					if _, err = writer.Write(message); err != nil {
-						b.Error(err)
-					}
-				}
-			})
-		})
-
-		writer.rotateBatch()
-
-		b.Run("Parallel (1000)", func(b *testing.B) {
-			b.SetParallelism(1000)
-			b.RunParallel(func(pb *testing.PB) {
-				for pb.Next() {
-					if _, err = writer.Write(message); err != nil {
-						b.Error(err)
-					}
-				}
-			})
-		})
+	b.Run("write", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			writer.Write([]byte(
+				"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?" +
+					"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?"))
+		}
 	})
+
+	writer.rotateBatch()
+
+	b.Run("write", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			writer.Write([]byte(
+				"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?" +
+					"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?" +
+					"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?"))
+		}
+	})
+
+	writer.rotateBatch()
+
+	b.Run("write", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			writer.Write([]byte(
+				"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?" +
+					"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?" +
+					"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?" +
+					"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?"))
+		}
+	})
+
+	writer.rotateBatch()
+
+	b.Run("write", func(b *testing.B) {
+		for i := 0; i < b.N; i++ {
+			writer.Write([]byte(
+				"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?" +
+					"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?" +
+					"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?" +
+					"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?" +
+					"1234567890QWERTYUIOP{}ASDFGHJKL:ZXCVBBNM<>?"))
+		}
+	})
+
+	writer.rotateBatch()
 }
 
-type stubStorage struct {
-	StoreOut  error
-	GetOut    *batch.Batch
-	IsUsedOut bool
-	DropOut   error
+type stubTransport struct{}
+
+func (s *stubTransport) SendBulk(body []byte) error {
+	return nil
 }
 
-func (s *stubStorage) Store(b *batch.Batch) error { return s.StoreOut }
-func (s *stubStorage) Get() (*batch.Batch, error) { return s.GetOut, nil }
-func (s *stubStorage) IsUsed() bool               { return s.IsUsedOut }
-func (s *stubStorage) Drop() error                { return s.DropOut }
-
-type stubTransport struct {
-	SendOut   error
-	IsLiveOut bool
+func (s *stubTransport) IsConnected() bool {
+	return true
 }
 
-func (s *stubTransport) SendBulk(*batch.Batch) error  { return s.SendOut }
-func (s *stubTransport) IsLive() bool                 { return s.IsLiveOut }
-func (s *stubTransport) Reconnected() <-chan struct{} { return nil }
+func (s *stubTransport) IsReconnected() <-chan struct{} {
+	return nil
+}
 
-func TestElasticWriter_Write(t *testing.T) {
-	fmt.Println(time.Now().Format("test-index-2006.01.02"))
+type stubStorage struct{}
+
+func (s *stubStorage) Put(data []byte) error {
+	return nil
+}
+
+func (s *stubStorage) Pop() ([]byte, error) {
+	return nil, nil
+}
+
+func (s *stubStorage) Drop() error {
+	return nil
+}
+
+func (s *stubStorage) IsUsed() bool {
+	return false
 }
