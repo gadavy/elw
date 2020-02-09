@@ -8,6 +8,23 @@ import (
 	"github.com/gadavy/elw/internal"
 )
 
+func NewElasticWriter(transport core.Transport, storage core.Storage) *ElasticWriter {
+	writer := &ElasticWriter{
+		transport:    transport,
+		storage:      storage,
+		BatchSize:    1024 * 1024,
+		TimeFormat:   "2006.01.02",
+		RotatePeriod: time.Second,
+		done:         make(chan struct{}, 1),
+	}
+
+	writer.batch = writer.acquireBatch()
+
+	go writer.worker()
+
+	return writer
+}
+
 type ElasticWriter struct {
 	noCopy noCopy // nolint:unused,structcheck
 
@@ -29,10 +46,6 @@ type ElasticWriter struct {
 	once internal.Once
 
 	done chan struct{}
-}
-
-func (w *ElasticWriter) Init() {
-	go w.worker()
 }
 
 func (w *ElasticWriter) Write(p []byte) (n int, err error) {
@@ -64,7 +77,15 @@ func (w *ElasticWriter) Sync() error {
 
 func (w *ElasticWriter) Close() error {
 	w.done <- struct{}{}
-	w.rotateBatch()
+
+	w.mu.Lock()
+
+	if (*w.batch).Len() > 0 {
+		w.rotateBatch()
+	}
+
+	w.mu.Unlock()
+
 	w.releaseStorage()
 
 	return nil
