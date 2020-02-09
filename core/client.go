@@ -17,7 +17,6 @@ const (
 )
 
 type NodeClient struct {
-	total  uint64
 	status uint32
 	host   string
 	*fasthttp.HostClient
@@ -38,14 +37,12 @@ func NewNodeClient(url string) *NodeClient {
 
 func (c *NodeClient) Do(req *fasthttp.Request, resp *fasthttp.Response) error {
 	req.SetHost(c.host)
-	atomic.AddUint64(&c.total, 1)
 
 	return c.HostClient.Do(req, resp)
 }
 
 func (c *NodeClient) DoTimeout(req *fasthttp.Request, resp *fasthttp.Response, timeout time.Duration) error {
 	req.SetHost(c.host)
-	atomic.AddUint64(&c.total, 1)
 
 	return c.HostClient.DoTimeout(req, resp, timeout)
 }
@@ -108,8 +105,8 @@ func (p *clientsPool) next(status uint32) (*NodeClient, error) {
 
 	var (
 		minC *NodeClient
-		minR        = math.MaxInt32
-		minT uint64 = math.MaxUint64
+		minR = math.MaxInt32
+		minT = time.Now()
 	)
 
 	for _, client := range clients {
@@ -118,9 +115,9 @@ func (p *clientsPool) next(status uint32) (*NodeClient, error) {
 		}
 
 		r := client.PendingRequests()
-		t := atomic.LoadUint64(&client.total)
+		t := client.LastUseTime()
 
-		if r < minR || (r == minR && t < minT) {
+		if r < minR || (r == minR && t.Before(minT)) {
 			minC = client
 			minR = r
 			minT = t

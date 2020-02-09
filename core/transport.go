@@ -32,7 +32,6 @@ type transport struct {
 
 func NewTransport(urls ...string) Transport {
 	transport := &transport{
-		connStatus:  1,
 		clientsPool: NewClientsPool(urls...),
 		successStatuses: map[int]bool{
 			fasthttp.StatusOK:       true,
