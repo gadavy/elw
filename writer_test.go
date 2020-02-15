@@ -11,10 +11,10 @@ func BenchmarkElasticWriter_Write(b *testing.B) {
 	writer := ElasticWriter{
 		transport:    new(stubTransport),
 		storage:      new(stubStorage),
-		BatchSize:    1024 * 1024,
-		IndexName:    "test-index-",
-		TimeFormat:   "2006.01.02",
-		RotatePeriod: time.Second,
+		batchSize:    1024 * 1024,
+		indexName:    "test-index-",
+		timeFormat:   "2006.01.02",
+		rotatePeriod: time.Second,
 		timer:        time.NewTimer(time.Second),
 	}
 

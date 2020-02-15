@@ -4,58 +4,74 @@ import (
 	"sync"
 	"time"
 
-	"github.com/gadavy/elw/core"
+	"github.com/gadavy/elw/batch"
 	"github.com/gadavy/elw/internal"
+	"github.com/gadavy/elw/storage"
+	"github.com/gadavy/elw/transport"
 )
 
-func NewElasticWriter(transport core.Transport, storage core.Storage) *ElasticWriter {
-	writer := &ElasticWriter{
-		transport:    transport,
-		storage:      storage,
-		BatchSize:    1024 * 1024,
-		TimeFormat:   "2006.01.02",
-		RotatePeriod: time.Second,
-		done:         make(chan struct{}, 1),
+func NewElasticWriter(cfg Config) (*ElasticWriter, error) {
+	cfg.validate()
+
+	tr, err := transport.New(cfg.getTransportConfig())
+	if err != nil {
+		return nil, err
 	}
 
-	writer.batch = writer.acquireBatch()
+	st, err := storage.NewStorage(cfg.Filepath)
+	if err != nil {
+		return nil, err
+	}
 
-	go writer.worker()
+	ew := &ElasticWriter{
+		batchSize:    cfg.BatchSize,
+		indexName:    cfg.IndexName,
+		timeFormat:   cfg.TimeFormat,
+		rotatePeriod: cfg.RotatePeriod,
 
-	return writer
+		transport: tr,
+		storage:   st,
+
+		done: make(internal.Signal, 1),
+	}
+
+	ew.batch = ew.acquireBatch()
+
+	go ew.worker()
+
+	return ew, nil
 }
 
 type ElasticWriter struct {
 	noCopy noCopy // nolint:unused,structcheck
 
-	BatchSize    int
-	RotatePeriod time.Duration
-	IndexName    string
-	TimeFormat   string
+	batchSize    int
+	rotatePeriod time.Duration
+	indexName    string
+	timeFormat   string
 
-	transport core.Transport
-	storage   core.Storage
-	logger    core.Logger
+	transport transport.Transport
+	storage   storage.Storage
+	logger    Logger
 
 	mu    sync.Mutex
-	batch **core.Batch
+	batch **batch.Batch
 	timer *time.Timer
 
 	batchPool sync.Pool
 
 	once internal.Once
-
-	done chan struct{}
+	done internal.Signal
 }
 
 func (w *ElasticWriter) Write(p []byte) (n int, err error) {
 	w.mu.Lock()
 
-	if (*w.batch).Len() > w.BatchSize {
+	if (*w.batch).Len()+len(p) > w.batchSize {
 		w.rotateBatch()
 	}
 
-	(*w.batch).AppendMeta(w.IndexName, w.TimeFormat)
+	(*w.batch).AppendMeta(w.indexName, w.timeFormat)
 	(*w.batch).AppendBytes(p)
 
 	w.mu.Unlock()
@@ -66,9 +82,7 @@ func (w *ElasticWriter) Write(p []byte) (n int, err error) {
 func (w *ElasticWriter) Sync() error {
 	w.mu.Lock()
 
-	if (*w.batch).Len() > 0 {
-		w.rotateBatch()
-	}
+	w.rotateBatch()
 
 	w.mu.Unlock()
 
@@ -76,39 +90,40 @@ func (w *ElasticWriter) Sync() error {
 }
 
 func (w *ElasticWriter) Close() error {
-	w.done <- struct{}{}
+	w.done.Send()
+	w.timer.Stop()
 
 	w.mu.Lock()
 
-	if (*w.batch).Len() > 0 {
-		w.rotateBatch()
-	}
-
-	w.mu.Unlock()
+	w.rotateBatch()
 
 	w.releaseStorage()
+
+	w.mu.Unlock()
 
 	return nil
 }
 
 func (w *ElasticWriter) rotateBatch() {
-	go w.releaseBatch(*w.batch)
+	if (*w.batch).Len() > 0 {
+		go w.releaseBatch(*w.batch)
 
-	w.batch = w.acquireBatch()
+		w.batch = w.acquireBatch()
+	}
 
-	w.timer.Reset(w.RotatePeriod)
+	w.timer.Reset(w.rotatePeriod)
 }
 
-func (w *ElasticWriter) acquireBatch() **core.Batch {
-	b, ok := w.batchPool.Get().(*core.Batch)
+func (w *ElasticWriter) acquireBatch() **batch.Batch {
+	b, ok := w.batchPool.Get().(*batch.Batch)
 	if !ok {
-		b = core.NewBatch(w.BatchSize)
+		b = batch.NewBatch(w.batchSize)
 	}
 
 	return &b
 }
 
-func (w *ElasticWriter) releaseBatch(b *core.Batch) {
+func (w *ElasticWriter) releaseBatch(b *batch.Batch) {
 	defer w.batchPool.Put(b)
 	defer b.Reset()
 
@@ -158,20 +173,14 @@ func (w *ElasticWriter) releaseStorage() {
 }
 
 func (w *ElasticWriter) worker() {
-	w.timer = time.NewTimer(w.RotatePeriod)
+	w.timer = time.NewTimer(w.rotatePeriod)
 
 	for {
 		select {
 		case <-w.transport.IsReconnected():
 			go w.once.Do(w.releaseStorage)
 		case <-w.timer.C:
-			w.mu.Lock()
-
-			if (*w.batch).Len() > 0 {
-				w.rotateBatch()
-			}
-
-			w.mu.Unlock()
+			w.rotateBatch()
 		case <-w.done:
 			return
 		}
