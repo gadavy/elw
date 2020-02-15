@@ -1,12 +1,15 @@
-package core
+package batch
 
 import (
+	"bytes"
 	"time"
 )
 
 const (
 	firstPartOfMetadata = "{\"index\":{\"_type\":\"doc\",\"_index\":\""
 	lastPartOfMetadata  = "\"}}\n"
+	delimiter           = "-"
+	newline             = "\n"
 )
 
 type Batch struct {
@@ -19,11 +22,16 @@ func NewBatch(size int) *Batch {
 
 func (b *Batch) AppendBytes(e []byte) {
 	b.buf = append(b.buf, e...)
+
+	if !bytes.HasSuffix(e, []byte(newline)) {
+		b.buf = append(b.buf, newline...)
+	}
 }
 
 func (b *Batch) AppendMeta(indexName, timeFormat string) {
 	b.buf = append(b.buf, firstPartOfMetadata...)
 	b.buf = append(b.buf, indexName...)
+	b.buf = append(b.buf, delimiter...)
 	b.buf = append(b.buf, time.Now().Format(timeFormat)...)
 	b.buf = append(b.buf, lastPartOfMetadata...)
 }
