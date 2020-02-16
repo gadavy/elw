@@ -19,7 +19,9 @@ type Storage interface {
 	IsUsed() bool
 }
 
-func NewStorage(path string) (Storage, error) {
+// New constructs a new logs storage.
+// To create storage that does not persist to disk use :memory: as the path of the file.
+func New(path string) (Storage, error) {
 	if path == ":memory:" {
 		return newMemoryStorage(), nil
 	}
@@ -46,6 +48,13 @@ func (s *MemoryStorage) Put(data []byte) error {
 
 func (s *MemoryStorage) Pop() (b []byte, err error) {
 	s.mu.Lock()
+
+	if len(s.storage) == 0 {
+		s.mu.Unlock()
+
+		return nil, errors.New("no such data")
+	}
+
 	b, s.storage = s.storage[0], s.storage[1:]
 	s.mu.Unlock()
 
@@ -69,28 +78,28 @@ func (s *MemoryStorage) IsUsed() (ok bool) {
 }
 
 type FileStorage struct {
-	path  string
+	dir   string
 	file  string
 	count int64
 }
 
 func newFileStorage(filepath string) (*FileStorage, error) {
-	dir, file := path.Split(filepath)
+	s := new(FileStorage)
+	s.dir, s.file = path.Split(filepath)
 
-	if err := os.MkdirAll(dir, os.ModePerm); err != nil {
+	if err := s.init(); err != nil {
 		return nil, err
 	}
 
-	if file == "" {
-		file = "app.log"
+	return s, nil
+}
+
+func (s *FileStorage) init() error {
+	if s.file == "" {
+		s.file = "app.log"
 	}
 
-	storage := &FileStorage{
-		path: dir,
-		file: file,
-	}
-
-	return storage, nil
+	return os.MkdirAll(s.dir, os.ModePerm)
 }
 
 func (s *FileStorage) Put(data []byte) (err error) {
@@ -105,7 +114,7 @@ func (s *FileStorage) Put(data []byte) (err error) {
 }
 
 func (s *FileStorage) Pop() (data []byte, err error) {
-	files, err := ioutil.ReadDir(s.path)
+	files, err := ioutil.ReadDir(s.dir)
 	if err != nil {
 		return nil, err
 	}
@@ -113,10 +122,10 @@ func (s *FileStorage) Pop() (data []byte, err error) {
 	if len(files) == 0 {
 		atomic.StoreInt64(&s.count, 0)
 
-		return nil, errors.New("no such files")
+		return nil, errors.New("no such data")
 	}
 
-	filename := fmt.Sprint(s.path, files[0].Name())
+	filename := fmt.Sprint(s.dir, files[0].Name())
 
 	data, err = ioutil.ReadFile(filename)
 	if err != nil {
@@ -132,29 +141,12 @@ func (s *FileStorage) Pop() (data []byte, err error) {
 	return data, nil
 }
 
-func (s *FileStorage) Drop() error {
-	files, err := ioutil.ReadDir(s.path)
-	if err != nil {
+func (s *FileStorage) Drop() (err error) {
+	if err = os.RemoveAll(s.dir); err != nil {
 		return err
 	}
 
-	if len(files) == 0 {
-		atomic.StoreInt64(&s.count, 0)
-
-		return errors.New("no such files")
-	}
-
-	for _, file := range files {
-		filename := fmt.Sprint(s.path, file.Name())
-
-		if err = os.Remove(filename); err != nil {
-			return err
-		}
-
-		atomic.AddInt64(&s.count, -1)
-	}
-
-	return nil
+	return s.init()
 }
 
 func (s *FileStorage) IsUsed() bool {
@@ -164,8 +156,8 @@ func (s *FileStorage) IsUsed() bool {
 func (s *FileStorage) filename() string {
 	t := strconv.FormatInt(time.Now().UnixNano(), 10)
 
-	buf := make([]byte, 0, len(s.path)+len(t)+len(s.file)+1)
-	buf = append(buf, s.path...)
+	buf := make([]byte, 0, len(s.dir)+len(t)+len(s.file)+1)
+	buf = append(buf, s.dir...)
 	buf = append(buf, s.file...)
 	buf = append(buf, "."...)
 	buf = append(buf, t...)
