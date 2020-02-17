@@ -1,7 +1,6 @@
 package storage
 
 import (
-	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -48,7 +47,7 @@ func TestNew(t *testing.T) {
 
 		assert.EqualError(t, err, "mkdir : no such file or directory")
 
-		if err = os.RemoveAll("logs"); err != nil {
+		if err = storage.Drop(); err != nil {
 			t.Error(err)
 		}
 	})
@@ -115,7 +114,7 @@ func TestFileStorage(t *testing.T) {
 	assert.EqualError(t, err, "no such data")
 	assert.False(t, storage.IsUsed(), "expected is not used")
 
-	if err = os.RemoveAll("logs"); err != nil {
+	if err = storage.Drop(); err != nil {
 		t.Error(err)
 	}
 }

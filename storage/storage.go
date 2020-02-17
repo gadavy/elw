@@ -142,11 +142,7 @@ func (s *FileStorage) Pop() (data []byte, err error) {
 }
 
 func (s *FileStorage) Drop() (err error) {
-	if err = os.RemoveAll(s.dir); err != nil {
-		return err
-	}
-
-	return s.init()
+	return os.RemoveAll(s.dir)
 }
 
 func (s *FileStorage) IsUsed() bool {
