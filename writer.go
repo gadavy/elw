@@ -18,7 +18,7 @@ func NewElasticWriter(cfg Config) (*ElasticWriter, error) {
 		return nil, err
 	}
 
-	st, err := storage.NewStorage(cfg.Filepath)
+	st, err := storage.New(cfg.Filepath)
 	if err != nil {
 		return nil, err
 	}
