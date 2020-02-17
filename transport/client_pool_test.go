@@ -1,8 +1,92 @@
 package transport
 
 import (
+	"errors"
 	"testing"
+
+	"github.com/stretchr/testify/assert"
 )
+
+func TestNewClientsPool(t *testing.T) {
+	tests := []struct {
+		name        string
+		urls        []string
+		wantErr     bool
+		expectedErr error
+		expectedRes interface{}
+	}{
+		{
+			name:        "Error",
+			urls:        []string{},
+			wantErr:     true,
+			expectedErr: errors.New("no servers available for connection"),
+			expectedRes: nil,
+		},
+		{
+			name:        "SinglePool",
+			urls:        []string{"http://127.0.0.1:9200"},
+			wantErr:     false,
+			expectedErr: errors.New("no servers available for connection"),
+			expectedRes: new(SinglePool),
+		},
+		{
+			name:        "ClusterPool",
+			urls:        []string{"http://127.0.0.1:9200", "http://127.0.0.1:9201"},
+			wantErr:     false,
+			expectedErr: errors.New("no servers available for connection"),
+			expectedRes: new(ClusterPool),
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			pool, err := NewClientsPool(tt.urls, "")
+			if (err != nil) != tt.wantErr {
+				t.Error(err)
+			}
+
+			assert.IsType(t, tt.expectedRes, pool)
+
+			if tt.wantErr {
+				assert.Error(t, err, tt.expectedErr.Error())
+			}
+		})
+	}
+}
+
+func TestSinglePool(t *testing.T) {
+	pool, err := NewClientsPool([]string{"http://127.0.0.1:9200"}, "")
+	if err != nil {
+		t.Error(err)
+	}
+
+	client, err := pool.NextLive()
+	assert.Error(t, err, ErrNoAvailableClients.Error())
+	assert.IsType(t, (*NodeClient)(nil), client)
+
+	client, err = pool.NextDead()
+	assert.Nil(t, err)
+	assert.IsType(t, new(NodeClient), client)
+
+	pool.OnSuccess(client)
+
+	client, err = pool.NextDead()
+	assert.Error(t, err, ErrNoAvailableClients.Error())
+	assert.IsType(t, (*NodeClient)(nil), client)
+
+	client, err = pool.NextLive()
+	assert.Nil(t, err)
+	assert.IsType(t, new(NodeClient), client)
+
+	pool.OnFailure(client)
+
+	client, err = pool.NextLive()
+	assert.Error(t, err, ErrNoAvailableClients.Error())
+	assert.IsType(t, (*NodeClient)(nil), client)
+
+	client, err = pool.NextDead()
+	assert.Nil(t, err)
+	assert.IsType(t, new(NodeClient), client)
+}
 
 func BenchmarkClusterPool_NextLive(b *testing.B) {
 	b.StopTimer()
