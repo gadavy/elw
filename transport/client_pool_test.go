@@ -3,6 +3,7 @@ package transport
 import (
 	"errors"
 	"testing"
+	"time"
 
 	"github.com/stretchr/testify/assert"
 )
@@ -86,6 +87,62 @@ func TestSinglePool(t *testing.T) {
 	client, err = pool.NextDead()
 	assert.Nil(t, err)
 	assert.IsType(t, new(NodeClient), client)
+}
+
+func TestClusterPool(t *testing.T) {
+	clients := []*NodeClient{
+		{
+			host:        "http://127.0.0.1:9200",
+			lastUseTime: time.Now().UnixNano(),
+		},
+		{
+			host:        "http://127.0.0.1:9201",
+			lastUseTime: time.Now().UnixNano(),
+		},
+	}
+
+	pool := ClusterPool{clients: clients}
+
+	client, err := pool.NextLive()
+	assert.Error(t, err, ErrNoAvailableClients.Error())
+	assert.IsType(t, (*NodeClient)(nil), client)
+
+	client, err = pool.NextDead()
+	assert.Nil(t, err)
+	assert.IsType(t, new(NodeClient), client)
+	assert.Equal(t, clients[0], client)
+
+	clients[0].lastUseTime = time.Now().UnixNano()
+
+	client, err = pool.NextDead()
+	assert.Nil(t, err)
+	assert.IsType(t, new(NodeClient), client)
+	assert.Equal(t, clients[1], client)
+
+	clients[1].lastUseTime = time.Now().UnixNano()
+
+	pool.OnSuccess(clients[1])
+
+	client, err = pool.NextLive()
+	assert.Nil(t, err)
+	assert.IsType(t, new(NodeClient), client)
+	assert.Equal(t, clients[1], client)
+
+	clients[1].lastUseTime = time.Now().UnixNano()
+
+	pool.OnSuccess(clients[0])
+
+	client, err = pool.NextLive()
+	assert.Nil(t, err)
+	assert.IsType(t, new(NodeClient), client)
+	assert.Equal(t, clients[0], client)
+
+	pool.OnFailure(clients[1])
+
+	client, err = pool.NextDead()
+	assert.Nil(t, err)
+	assert.IsType(t, new(NodeClient), client)
+	assert.Equal(t, clients[1], client)
 }
 
 func BenchmarkClusterPool_NextLive(b *testing.B) {
