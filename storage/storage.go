@@ -94,12 +94,24 @@ func newFileStorage(filepath string) (*FileStorage, error) {
 	return s, nil
 }
 
-func (s *FileStorage) init() error {
+func (s *FileStorage) init() (err error) {
 	if s.file == "" {
 		s.file = "app.log"
 	}
 
-	return os.MkdirAll(s.dir, os.ModePerm)
+	err = os.MkdirAll(s.dir, os.ModePerm)
+	if err != nil {
+		return err
+	}
+
+	files, err := ioutil.ReadDir(s.dir)
+	if err != nil {
+		return err
+	}
+
+	s.count = int64(len(files))
+
+	return nil
 }
 
 func (s *FileStorage) Put(data []byte) (err error) {
