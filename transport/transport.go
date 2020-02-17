@@ -78,7 +78,7 @@ func (t *httpTransport) SendBulk(body []byte) error {
 	for {
 		client, err = t.clientsPool.NextLive()
 		if err != nil {
-			atomic.StoreUint32(&t.connStatus, 0)
+			atomic.StoreUint32(&t.connStatus, isDead)
 
 			t.deadSignal.Send()
 
@@ -86,18 +86,14 @@ func (t *httpTransport) SendBulk(body []byte) error {
 		}
 
 		code, err = client.BulkRequest(body, t.requestTimeout)
-		if err == fasthttp.ErrNoFreeConns {
-			continue
+		if err == nil && t.successCodes[code] {
+			return nil
 		}
 
-		if err != nil || !t.successCodes[code] {
+		if err != fasthttp.ErrNoFreeConns {
 			t.clientsPool.OnFailure(client)
 			t.deadSignal.Send()
-
-			continue
 		}
-
-		return nil
 	}
 }
 
@@ -119,7 +115,7 @@ func (t *httpTransport) pingDeadNodes() {
 		if err == nil && t.successCodes[code] {
 			t.clientsPool.OnSuccess(client)
 
-			atomic.StoreUint32(&t.connStatus, 1)
+			atomic.StoreUint32(&t.connStatus, isLive)
 
 			t.liveSignal.Send()
 		}
