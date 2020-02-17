@@ -1,7 +1,6 @@
 package transport
 
 import (
-	"errors"
 	"testing"
 	"time"
 
@@ -13,28 +12,26 @@ func TestNewClientsPool(t *testing.T) {
 		name        string
 		urls        []string
 		wantErr     bool
-		expectedErr error
+		expectedErr string
 		expectedRes interface{}
 	}{
 		{
 			name:        "Error",
 			urls:        []string{},
 			wantErr:     true,
-			expectedErr: errors.New("no servers available for connection"),
+			expectedErr: "no servers available for connection",
 			expectedRes: nil,
 		},
 		{
 			name:        "SinglePool",
 			urls:        []string{"http://127.0.0.1:9200"},
 			wantErr:     false,
-			expectedErr: errors.New("no servers available for connection"),
 			expectedRes: new(SinglePool),
 		},
 		{
 			name:        "ClusterPool",
 			urls:        []string{"http://127.0.0.1:9200", "http://127.0.0.1:9201"},
 			wantErr:     false,
-			expectedErr: errors.New("no servers available for connection"),
 			expectedRes: new(ClusterPool),
 		},
 	}
@@ -48,7 +45,7 @@ func TestNewClientsPool(t *testing.T) {
 			assert.IsType(t, tt.expectedRes, pool)
 
 			if tt.wantErr {
-				assert.Error(t, err, tt.expectedErr.Error())
+				assert.EqualError(t, err, tt.expectedErr)
 			}
 		})
 	}
@@ -104,7 +101,7 @@ func TestClusterPool(t *testing.T) {
 	pool := ClusterPool{clients: clients}
 
 	client, err := pool.NextLive()
-	assert.Error(t, err, ErrNoAvailableClients.Error())
+	assert.EqualError(t, err, ErrNoAvailableClients.Error())
 	assert.IsType(t, (*NodeClient)(nil), client)
 
 	client, err = pool.NextDead()

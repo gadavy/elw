@@ -106,7 +106,7 @@ func TestNodeClient_BulkRequest(t *testing.T) {
 			assert.Equal(t, tt.expectedCode, code)
 
 			if tt.wantErr {
-				assert.Equal(t, tt.expectedErr, err)
+				assert.EqualError(t, err, tt.expectedErr.Error())
 			}
 
 			listener.Close()
@@ -209,7 +209,7 @@ func TestNodeClient_PingRequest(t *testing.T) {
 			assert.Equal(t, tt.expectedCode, code)
 
 			if tt.wantErr {
-				assert.Equal(t, tt.expectedErr, err)
+				assert.EqualError(t, err, tt.expectedErr.Error())
 			}
 
 			listener.Close()
