@@ -42,8 +42,8 @@ type Config struct {
 	UserAgent      string
 
 	// Storage settings
-	Filepath string
-	Drop     bool
+	Filepath    string
+	DropStorage bool
 }
 
 func (c *Config) validate() {

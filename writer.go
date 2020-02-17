@@ -28,6 +28,7 @@ func NewElasticWriter(cfg Config) (*ElasticWriter, error) {
 		indexName:    cfg.IndexName,
 		timeFormat:   cfg.TimeFormat,
 		rotatePeriod: cfg.RotatePeriod,
+		dropStorage:  cfg.DropStorage,
 
 		transport: tr,
 		storage:   st,
@@ -45,23 +46,24 @@ func NewElasticWriter(cfg Config) (*ElasticWriter, error) {
 type ElasticWriter struct {
 	noCopy noCopy // nolint:unused,structcheck
 
+	transport transport.Transport
+	storage   storage.Storage
+	logger    Logger
+
 	batchSize    int
 	rotatePeriod time.Duration
 	indexName    string
 	timeFormat   string
+	dropStorage  bool
 
-	transport transport.Transport
-	storage   storage.Storage
-	logger    Logger
+	once internal.Once
+	done internal.Signal
 
 	mu    sync.Mutex
 	batch **batch.Batch
 	timer *time.Timer
 
 	batchPool sync.Pool
-
-	once internal.Once
-	done internal.Signal
 }
 
 func (w *ElasticWriter) Write(p []byte) (n int, err error) {
@@ -100,6 +102,10 @@ func (w *ElasticWriter) Close() error {
 	w.releaseStorage()
 
 	w.mu.Unlock()
+
+	if w.dropStorage {
+		return w.storage.Drop()
+	}
 
 	return nil
 }
