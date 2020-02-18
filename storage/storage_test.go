@@ -1,6 +1,8 @@
 package storage
 
 import (
+	"io/ioutil"
+	"os"
 	"testing"
 
 	"github.com/stretchr/testify/assert"
@@ -113,6 +115,27 @@ func TestFileStorage(t *testing.T) {
 	_, err = storage.Pop()
 	assert.EqualError(t, err, "no such data")
 	assert.False(t, storage.IsUsed(), "expected is not used")
+
+	if err = storage.Drop(); err != nil {
+		t.Error(err)
+	}
+
+	err = os.MkdirAll("logs/tmp.log", os.ModePerm)
+	if err != nil {
+		t.Error(err)
+	}
+
+	err = ioutil.WriteFile("logs/tmp.log.1", []byte("message"), os.ModePerm)
+	if err != nil {
+		t.Error(err)
+	}
+
+	storage, err = newFileStorage("logs/tmp.log")
+	if err != nil {
+		t.Error(err)
+	}
+
+	assert.True(t, storage.IsUsed(), "expected is used")
 
 	if err = storage.Drop(); err != nil {
 		t.Error(err)
