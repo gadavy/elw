@@ -49,7 +49,7 @@ type Config struct {
 func (c *Config) validate() {
 	// Check writer settings
 	if c.BatchSize <= MinimalBatchSize {
-		c.BatchSize = DefaultBatchSize
+		c.BatchSize = MinimalBatchSize
 	}
 
 	if c.IndexName == "" {
