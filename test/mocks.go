@@ -50,3 +50,9 @@ type MockLogger struct {
 func (m *MockLogger) Printf(format string, v ...interface{}) {
 	m.Called(fmt.Sprintf(format, v...))
 }
+
+type StubTransport struct{}
+
+func (m *StubTransport) SendBulk(body []byte) error     { return nil }
+func (m *StubTransport) IsConnected() bool              { return true }
+func (m *StubTransport) IsReconnected() <-chan struct{} { return nil }

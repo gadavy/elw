@@ -3,6 +3,9 @@ package elw
 import (
 	"errors"
 	"testing"
+	"time"
+
+	"github.com/stretchr/testify/assert"
 
 	"github.com/gadavy/elw/batch"
 	"github.com/gadavy/elw/test"
@@ -111,7 +114,7 @@ func TestElasticWriter_releaseBatch(t *testing.T) {
 			},
 		},
 		{
-			name:      "NotConnectedPutPass",
+			name:      "NotConnectedPutError",
 			input:     []byte("Message\n"),
 			transport: &test.MockTransport{},
 			transportIsConnectedOut: []interface{}{
@@ -151,4 +154,26 @@ func TestElasticWriter_releaseBatch(t *testing.T) {
 			writer.releaseBatch(b)
 		})
 	}
+}
+
+func TestElasticWriter_AcquireAndRotateBatch(t *testing.T) {
+	writer := ElasticWriter{
+		transport: new(test.StubTransport),
+		timer:     time.NewTimer(time.Second),
+	}
+
+	res := writer.acquireBatch()
+
+	b := &batch.Batch{}
+	expected := &b
+
+	assert.IsType(t, expected, res)
+
+	writer.batch = expected
+
+	(*expected).AppendBytes([]byte("1"))
+
+	writer.rotateBatch()
+
+	assert.NotEqual(t, *expected, *writer.batch)
 }
