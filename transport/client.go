@@ -92,7 +92,7 @@ func (c *NodeClient) PingRequest(timeout time.Duration) (code int, err error) {
 	return resp.StatusCode(), err
 }
 
-// PendingRequests returns all pending request of this node client.
+// PendingRequests returns all pending request of node client.
 func (c *NodeClient) PendingRequests() int {
 	return c.client.PendingRequests()
 }

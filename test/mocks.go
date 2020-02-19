@@ -8,14 +8,18 @@ import (
 
 type MockTransport struct {
 	mock.Mock
+	isConnectedCounter int
 }
 
 func (m *MockTransport) SendBulk(body []byte) error {
 	return m.Called(body).Error(0)
 }
 
-func (m *MockTransport) IsConnected() bool {
-	return m.Called().Bool(0)
+func (m *MockTransport) IsConnected() (ok bool) {
+	ok = m.Called().Bool(0 + m.isConnectedCounter)
+	m.isConnectedCounter++
+
+	return ok
 }
 
 func (m *MockTransport) IsReconnected() <-chan struct{} {
@@ -24,6 +28,8 @@ func (m *MockTransport) IsReconnected() <-chan struct{} {
 
 type MockStorage struct {
 	mock.Mock
+
+	isUsedCounter int
 }
 
 func (m *MockStorage) Put(data []byte) error {
@@ -31,7 +37,7 @@ func (m *MockStorage) Put(data []byte) error {
 }
 
 func (m *MockStorage) Pop() ([]byte, error) {
-	args := m.Called(m)
+	args := m.Called()
 	return args.Get(0).([]byte), args.Error(1)
 }
 
@@ -39,8 +45,11 @@ func (m *MockStorage) Drop() error {
 	return m.Called().Error(0)
 }
 
-func (m *MockStorage) IsUsed() bool {
-	return m.Called().Bool(0)
+func (m *MockStorage) IsUsed() (ok bool) {
+	ok = m.Called().Bool(0 + m.isUsedCounter)
+	m.isUsedCounter++
+
+	return ok
 }
 
 type MockLogger struct {
@@ -53,6 +62,6 @@ func (m *MockLogger) Printf(format string, v ...interface{}) {
 
 type StubTransport struct{}
 
-func (m *StubTransport) SendBulk(body []byte) error     { return nil }
+func (m *StubTransport) SendBulk([]byte) error          { return nil }
 func (m *StubTransport) IsConnected() bool              { return true }
 func (m *StubTransport) IsReconnected() <-chan struct{} { return nil }
