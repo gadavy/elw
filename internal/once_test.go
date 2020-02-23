@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"sync"
 	"testing"
 	"time"
 
@@ -8,18 +9,23 @@ import (
 )
 
 func TestOnce_Do(t *testing.T) {
-	once := Once{}
+	var (
+		once = Once{}
+		wg   = &sync.WaitGroup{}
+	)
 
 	var count int
 
 	for i := 0; i < 5; i++ {
-		go once.Do(func() {
+		wg.Add(1)
+
+		go once.DoWG(wg, func() {
 			count++
 			time.Sleep(time.Second)
 		})
 	}
 
-	time.Sleep(time.Second)
+	wg.Wait()
 
 	assert.Equal(t, 1, count, "expected 1")
 }

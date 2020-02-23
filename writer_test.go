@@ -2,6 +2,7 @@ package elw
 
 import (
 	"errors"
+	"sync"
 	"testing"
 	"time"
 
@@ -149,7 +150,10 @@ func TestElasticWriter_releaseBatch(t *testing.T) {
 				transport: tt.transport,
 				storage:   tt.storage,
 				logger:    tt.logger,
+				wg:        new(sync.WaitGroup),
 			}
+
+			writer.wg.Add(1)
 
 			writer.releaseBatch(b)
 		})
@@ -160,6 +164,7 @@ func TestElasticWriter_AcquireAndRotateBatch(t *testing.T) {
 	writer := ElasticWriter{
 		transport: new(test.StubTransport),
 		timer:     time.NewTimer(time.Second),
+		wg:        new(sync.WaitGroup),
 	}
 
 	res := writer.acquireBatch()
@@ -322,6 +327,7 @@ func TestElasticWriter_releaseStorage(t *testing.T) {
 				transport: tt.transport,
 				storage:   tt.storage,
 				logger:    tt.logger,
+				wg:        new(sync.WaitGroup),
 			}
 
 			writer.releaseStorage()

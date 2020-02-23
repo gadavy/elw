@@ -34,9 +34,11 @@ func NewElasticWriter(cfg Config) (*ElasticWriter, error) {
 		storage:   st,
 
 		done: make(internal.Signal, 1),
+		wg:   new(sync.WaitGroup),
 	}
 
 	ew.batch = ew.acquireBatch()
+	ew.timer = time.NewTimer(ew.rotatePeriod)
 
 	go ew.worker()
 
@@ -56,6 +58,7 @@ type ElasticWriter struct {
 	timeFormat   string
 	dropStorage  bool
 
+	wg   *sync.WaitGroup
 	once internal.Once
 	done internal.Signal
 
@@ -93,13 +96,15 @@ func (w *ElasticWriter) Sync() error {
 
 func (w *ElasticWriter) Close() error {
 	w.done.Send()
-	w.timer.Stop()
 
 	w.mu.Lock()
 
 	w.rotateBatch()
 
-	w.releaseStorage()
+	w.wg.Add(1)
+	w.once.DoWG(w.wg, w.releaseStorage)
+
+	w.wg.Wait()
 
 	w.mu.Unlock()
 
@@ -112,6 +117,8 @@ func (w *ElasticWriter) Close() error {
 
 func (w *ElasticWriter) rotateBatch() {
 	if (*w.batch).Len() > 0 {
+		w.wg.Add(1)
+
 		go w.releaseBatch(*w.batch)
 
 		w.batch = w.acquireBatch()
@@ -130,6 +137,7 @@ func (w *ElasticWriter) acquireBatch() **batch.Batch {
 }
 
 func (w *ElasticWriter) releaseBatch(b *batch.Batch) {
+	defer w.wg.Done()
 	defer w.batchPool.Put(b)
 	defer b.Reset()
 
@@ -179,12 +187,10 @@ func (w *ElasticWriter) releaseStorage() {
 }
 
 func (w *ElasticWriter) worker() {
-	w.timer = time.NewTimer(w.rotatePeriod)
-
 	for {
 		select {
 		case <-w.transport.IsReconnected():
-			go w.once.Do(w.releaseStorage)
+			go w.once.DoWG(w.wg, w.releaseStorage)
 		case <-w.timer.C:
 			w.rotateBatch()
 		case <-w.done:

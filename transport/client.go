@@ -27,7 +27,7 @@ type NodeClient struct {
 	client fasthttp.HostClient
 }
 
-// NewNodeClient create base elastic node client with small api.
+// NewNodeClient create elastic node client with small api.
 func NewNodeClient(url, useragent string) *NodeClient {
 	client := &NodeClient{
 		host:      url,
@@ -100,4 +100,25 @@ func (c *NodeClient) PendingRequests() int {
 // LastUseTime returns time of last started request.
 func (c *NodeClient) LastUseTime() int {
 	return int(atomic.LoadInt64(&c.lastUseTime))
+}
+
+func (c *NodeClient) GetNodesInfo(timeout time.Duration) (body []byte, code int, err error) {
+	const requestURI = "/_nodes/http"
+
+	req := fasthttp.AcquireRequest()
+	defer fasthttp.ReleaseRequest(req)
+
+	resp := fasthttp.AcquireResponse()
+	defer fasthttp.ReleaseResponse(resp)
+
+	req.Header.SetMethod(fasthttp.MethodGet)
+	req.Header.SetUserAgent(c.useragent)
+	req.Header.SetRequestURI(requestURI)
+	req.Header.SetHost(c.host)
+
+	atomic.StoreInt64(&c.lastUseTime, time.Now().UnixNano())
+
+	err = c.client.DoTimeout(req, resp, timeout)
+
+	return resp.Body(), resp.StatusCode(), err
 }
