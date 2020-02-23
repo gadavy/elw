@@ -39,7 +39,7 @@ func TestNew(t *testing.T) {
 			},
 			wantErr: false,
 			expectedRes: &httpTransport{
-				connStatus:     isDead,
+				connStatus:     isLive,
 				requestTimeout: time.Hour,
 				pingInterval:   time.Hour,
 				successCodes:   map[int]bool{200: true, 201: true, 202: true},

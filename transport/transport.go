@@ -43,6 +43,7 @@ func New(cfg Config) (Transport, error) {
 
 	transport := &httpTransport{
 		clientsPool:    pool,
+		connStatus:     isLive,
 		pingInterval:   cfg.PingInterval,
 		requestTimeout: cfg.RequestTimeout,
 		successCodes:   make(map[int]bool),
