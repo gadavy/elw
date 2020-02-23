@@ -1,6 +1,8 @@
 github.com/davecgh/go-spew v1.1.0/go.mod h1:J7Y8YcW2NihsgmVo/mv3lAwl/skON4iLHjSsI+c5H38=
 github.com/gadavy/elw v0.0.0-20200223204027-5549a157afa1 h1:A0fiOKHzBbC3ZyyWJcCFTmRK8G1OaedVt9U0Yxxt7+g=
 github.com/gadavy/elw v0.0.0-20200223204027-5549a157afa1/go.mod h1:Crp6l6pYUHPONHJ65KNxJ9mCniDLCee1xcseG4aAGHU=
+github.com/gadavy/elw v0.0.0-20200223220349-479894d65dc0 h1:gQPu3N3KRmV+lMZ6aM3sYpH54TNjBEmN6TgAr42EprA=
+github.com/gadavy/elw v0.0.0-20200223220349-479894d65dc0/go.mod h1:Crp6l6pYUHPONHJ65KNxJ9mCniDLCee1xcseG4aAGHU=
 github.com/klauspost/compress v1.8.2 h1:Bx0qjetmNjdFXASH02NSAREKpiaDwkO1DRZ3dV2KCcs=
 github.com/klauspost/compress v1.8.2/go.mod h1:RyIbtBH6LamlWaDj8nUwkbUhJ87Yi3uG0guNDohfE1A=
 github.com/klauspost/cpuid v1.2.1 h1:vJi+O/nMdFt0vqm8NZBI6wzALWdA2X+egi0ogNyrC/w=
