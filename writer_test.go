@@ -3,6 +3,7 @@ package elw
 import (
 	"errors"
 	"sync"
+	"sync/atomic"
 	"testing"
 	"time"
 
@@ -181,7 +182,7 @@ func TestElasticWriter_AcquireAndRotateBatch(t *testing.T) {
 
 	writer.rotateBatch()
 
-	assert.NotEqual(t, *expected, *writer.batch)
+	assert.NotEqual(t, []byte("1"), (*writer.batch).Bytes())
 }
 
 func TestElasticWriter_releaseStorage(t *testing.T) {
@@ -429,12 +430,12 @@ func TestElasticWriter_Close(t *testing.T) {
 
 	writer.batch = writer.acquireBatch()
 
-	var isWork int
+	var isWork int64
 
 	go func() {
-		isWork++
+		atomic.AddInt64(&isWork, 1)
 		writer.worker()
-		isWork--
+		atomic.AddInt64(&isWork, -1)
 	}()
 
 	reconnectCh.Send()
@@ -447,5 +448,5 @@ func TestElasticWriter_Close(t *testing.T) {
 
 	writer.wg.Wait()
 
-	assert.Equal(t, 0, isWork)
+	assert.Equal(t, int64(0), atomic.LoadInt64(&isWork))
 }

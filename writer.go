@@ -195,7 +195,9 @@ func (w *ElasticWriter) worker() {
 
 			go w.once.DoWG(w.wg, w.releaseStorage)
 		case <-w.timer.C:
+			w.mu.Lock()
 			w.rotateBatch()
+			w.mu.Unlock()
 		case <-w.done:
 			return
 		}
