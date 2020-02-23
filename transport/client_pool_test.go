@@ -52,9 +52,11 @@ func TestNewClientsPool(t *testing.T) {
 }
 
 func TestSinglePool(t *testing.T) {
-	pool, err := NewClientsPool([]string{"http://127.0.0.1:9200"}, "")
-	if err != nil {
-		t.Error(err)
+	pool := SinglePool{
+		client: &NodeClient{
+			host:        "http://127.0.0.1:9200",
+			lastUseTime: time.Now().UnixNano(),
+		},
 	}
 
 	client, err := pool.NextLive()

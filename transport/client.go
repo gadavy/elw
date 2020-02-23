@@ -32,6 +32,7 @@ func NewNodeClient(url, useragent string) *NodeClient {
 	client := &NodeClient{
 		host:      url,
 		useragent: useragent,
+		status:    isLive,
 		client: fasthttp.HostClient{
 			Addr:                strings.TrimPrefix(url, "http://"),
 			MaxIdleConnDuration: MaxIdleConnDuration,
