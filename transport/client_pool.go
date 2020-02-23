@@ -39,7 +39,7 @@ type SinglePool struct {
 }
 
 func (p *SinglePool) NextLive() (*NodeClient, error) {
-	if p.client.status != isLive {
+	if atomic.LoadUint32(&p.client.status) != isLive {
 		return nil, ErrNoAvailableClients
 	}
 
@@ -47,7 +47,7 @@ func (p *SinglePool) NextLive() (*NodeClient, error) {
 }
 
 func (p *SinglePool) NextDead() (*NodeClient, error) {
-	if p.client.status != isDead {
+	if atomic.LoadUint32(&p.client.status) != isDead {
 		return nil, ErrNoAvailableClients
 	}
 
@@ -95,7 +95,7 @@ func (p *ClusterPool) next(status uint32) (*NodeClient, error) {
 	)
 
 	for _, client := range clients {
-		if client.status != status {
+		if atomic.LoadUint32(&client.status) != status {
 			continue
 		}
 
