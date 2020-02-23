@@ -4,6 +4,8 @@ import (
 	"fmt"
 
 	"github.com/stretchr/testify/mock"
+
+	"github.com/gadavy/elw/internal"
 )
 
 type MockTransport struct {
@@ -60,8 +62,17 @@ func (m *MockLogger) Printf(format string, v ...interface{}) {
 	m.Called(fmt.Sprintf(format, v...))
 }
 
-type StubTransport struct{}
+type StubTransport struct {
+	Ch internal.Signal
+}
 
 func (m *StubTransport) SendBulk([]byte) error          { return nil }
 func (m *StubTransport) IsConnected() bool              { return true }
-func (m *StubTransport) IsReconnected() <-chan struct{} { return nil }
+func (m *StubTransport) IsReconnected() <-chan struct{} { return m.Ch }
+
+type StubStorage struct{}
+
+func (m *StubStorage) Put([]byte) error     { return nil }
+func (m *StubStorage) Pop() ([]byte, error) { return nil, nil }
+func (m *StubStorage) Drop() error          { return nil }
+func (m *StubStorage) IsUsed() bool         { return false }

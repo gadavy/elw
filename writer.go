@@ -190,6 +190,8 @@ func (w *ElasticWriter) worker() {
 	for {
 		select {
 		case <-w.transport.IsReconnected():
+			w.wg.Add(1)
+
 			go w.once.DoWG(w.wg, w.releaseStorage)
 		case <-w.timer.C:
 			w.rotateBatch()

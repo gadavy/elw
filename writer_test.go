@@ -9,6 +9,7 @@ import (
 	"github.com/stretchr/testify/assert"
 
 	"github.com/gadavy/elw/batch"
+	"github.com/gadavy/elw/internal"
 	"github.com/gadavy/elw/test"
 )
 
@@ -333,4 +334,118 @@ func TestElasticWriter_releaseStorage(t *testing.T) {
 			writer.releaseStorage()
 		})
 	}
+}
+
+func TestElasticWriter_Write(t *testing.T) {
+	tests := []struct {
+		name                    string
+		batchSize               int
+		input                   []byte
+		transport               *test.MockTransport
+		transportIsConnectedOut []interface{}
+		transportSendBulkIn     []interface{}
+		transportSendBulkOut    []interface{}
+	}{
+		{
+			name:      "PassWithRotate",
+			batchSize: 1,
+			input:     []byte("test message"),
+			transport: &test.MockTransport{},
+			transportIsConnectedOut: []interface{}{
+				true,
+			},
+			transportSendBulkIn: []interface{}{
+				[]byte("test message\n"),
+			},
+			transportSendBulkOut: []interface{}{
+				(error)(nil),
+			},
+		},
+	}
+	for _, tt := range tests {
+		t.Run(tt.name, func(t *testing.T) {
+			tt.transport.On("IsConnected").Return(tt.transportIsConnectedOut...)
+			tt.transport.On("SendBulk", tt.transportSendBulkIn...).Return(tt.transportSendBulkOut...)
+
+			writer := ElasticWriter{
+				batchSize: tt.batchSize,
+				transport: tt.transport,
+				wg:        new(sync.WaitGroup),
+
+				rotatePeriod: time.Second,
+				timer:        time.NewTimer(time.Second),
+			}
+
+			writer.batch = writer.acquireBatch()
+
+			n, _ := writer.Write(tt.input)
+			writer.wg.Wait()
+
+			assert.Equal(t, len(tt.input), n)
+		})
+	}
+}
+
+func TestElasticWriter_Sync(t *testing.T) {
+	message := []byte("test message")
+	expected := []byte("{\"index\":{\"_type\":\"doc\",\"_index\":\"-\"}}\ntest message\n")
+
+	transport := &test.MockTransport{}
+	transport.On("IsConnected").Return([]interface{}{true}...)
+	transport.On("SendBulk", []interface{}{expected}...).Return([]interface{}{(error)(nil)}...)
+
+	writer := ElasticWriter{
+		batchSize: 100,
+		transport: transport,
+		wg:        new(sync.WaitGroup),
+
+		rotatePeriod: time.Second,
+		timer:        time.NewTimer(time.Second),
+	}
+
+	writer.batch = writer.acquireBatch()
+
+	_, _ = writer.Write(message)
+
+	assert.Nil(t, writer.Sync(), "expected nil error in sync method")
+
+	writer.wg.Wait()
+}
+
+func TestElasticWriter_Close(t *testing.T) {
+	reconnectCh := make(internal.Signal, 1)
+
+	writer := ElasticWriter{
+		batchSize: 100,
+		transport: &test.StubTransport{Ch: reconnectCh},
+		storage:   &test.StubStorage{},
+		wg:        new(sync.WaitGroup),
+
+		rotatePeriod: time.Second,
+		timer:        time.NewTimer(time.Second),
+
+		done: make(internal.Signal, 1),
+	}
+
+	writer.batch = writer.acquireBatch()
+
+	var isWork int
+
+	go func() {
+		isWork++
+		writer.worker()
+		isWork--
+	}()
+
+	reconnectCh.Send()
+
+	time.Sleep(time.Second * 1)
+
+	_ = writer.Close()
+
+	time.Sleep(time.Second * 1)
+
+	writer.wg.Wait()
+
+	assert.Equal(t, 0, isWork)
 }
