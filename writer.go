@@ -58,13 +58,14 @@ type ElasticWriter struct {
 	timeFormat   string
 	dropStorage  bool
 
-	wg   *sync.WaitGroup
 	once internal.Once
 	done internal.Signal
 
 	mu    sync.Mutex
 	batch **batch.Batch
 	timer *time.Timer
+
+	wg *sync.WaitGroup
 
 	batchPool sync.Pool
 }
